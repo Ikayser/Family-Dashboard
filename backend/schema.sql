@@ -212,7 +212,8 @@ INSERT INTO survey_questions (question_text, question_type, category, recurring,
     ('Does Marnie have basketball practice this week?', 'boolean', 'activities', TRUE, 'weekly'),
     ('Does Lola have tennis this week?', 'boolean', 'activities', TRUE, 'weekly'),
     ('Any special pickups or schedule changes this week?', 'text', 'logistics', TRUE, 'weekly'),
-    ('Any playdates or social activities planned?', 'text', 'social', TRUE, 'weekly')
+    ('Any playdates or social activities planned?', 'text', 'social', TRUE, 'weekly'),
+    ('Anything else? (Add activities, travel, notes - I''ll parse it!)', 'text', 'other', TRUE, 'weekly')
 ON CONFLICT DO NOTHING;
 
 -- Create indexes for performance
