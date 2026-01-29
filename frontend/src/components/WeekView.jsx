@@ -1,6 +1,6 @@
 import React from 'react'
 import { format, parseISO, isToday } from 'date-fns'
-import { Plane, Calendar, AlertTriangle, Sun, Users } from 'lucide-react'
+import { Plane, Calendar, AlertTriangle, Sun, Users, BookOpen } from 'lucide-react'
 
 export default function WeekView({ days, members }) {
   return (
@@ -51,6 +51,19 @@ function DayCard({ day }) {
       {day.school_days_off?.map((sdo, idx) => (
         <div key={idx} className="mb-1 text-xs bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded truncate">
           {sdo.school_name}: {sdo.name || 'No School'}
+        </div>
+      ))}
+
+      {/* School specials (Week A/B) */}
+      {day.school_specials?.map((special, idx) => (
+        <div
+          key={`special-${idx}`}
+          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
+          style={{ backgroundColor: `${special.student_color}15`, borderLeft: `2px solid ${special.student_color}` }}
+          title={`${special.student_name}: ${special.activity_name}`}
+        >
+          <BookOpen className="w-3 h-3 mr-1 flex-shrink-0 text-gray-500" />
+          <span className="truncate">{special.activity_name}</span>
         </div>
       ))}
 
