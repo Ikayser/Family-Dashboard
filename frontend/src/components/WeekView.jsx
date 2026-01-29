@@ -59,6 +59,19 @@ function DayCard({ day }) {
         )}
       </div>
 
+      {/* Travel - always at top */}
+      {day.travel?.map((trip, idx) => (
+        <div
+          key={idx}
+          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
+          style={{ backgroundColor: `${trip.member_color}20`, color: trip.member_color }}
+          title={`${trip.member_name}: ${trip.destination || 'Traveling'}`}
+        >
+          <Plane className="w-3 h-3 mr-1 flex-shrink-0" />
+          <span className="truncate">{trip.member_name}: {trip.destination}</span>
+        </div>
+      ))}
+
       {/* Holiday */}
       {day.holiday && (
         <div className="mb-2 text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded truncate">
@@ -89,19 +102,6 @@ function DayCard({ day }) {
             <span className="text-gray-500 mr-1 flex-shrink-0">{formatTime(special.start_time)}</span>
           )}
           <span className="truncate">{special.activity_name}</span>
-        </div>
-      ))}
-
-      {/* Travel */}
-      {day.travel?.map((trip, idx) => (
-        <div
-          key={idx}
-          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
-          style={{ backgroundColor: `${trip.member_color}20`, color: trip.member_color }}
-          title={`${trip.member_name}: ${trip.destination || 'Traveling'}`}
-        >
-          <Plane className="w-3 h-3 mr-1 flex-shrink-0" />
-          <span className="truncate">{trip.member_name}</span>
         </div>
       ))}
 
