@@ -1,15 +1,22 @@
 import React, { useState } from 'react'
-import { Users, Plus, Edit2, Trash2, RefreshCw, Upload } from 'lucide-react'
+import { Users, Plus, Edit2, Trash2, RefreshCw, Upload, Calendar, Eye, Check, X } from 'lucide-react'
 import { useApi, useMutation } from '../hooks/useApi'
 import api from '../utils/api'
 import Modal from '../components/Modal'
 import AlertBanner from '../components/AlertBanner'
+
+// Hardcoded calendar URL
+const CALENDAR_URL = 'https://calendar.google.com/calendar/ical/family03792455813076733653%40group.calendar.google.com/private-b8780f011620ae68068a9b4b356c827e/basic.ics';
 
 export default function Settings() {
   const [showAddMember, setShowAddMember] = useState(false)
   const [editingMember, setEditingMember] = useState(null)
   const [fetchingHolidays, setFetchingHolidays] = useState(false)
   const [holidayResult, setHolidayResult] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [syncResult, setSyncResult] = useState(null)
+  const [previewData, setPreviewData] = useState(null)
 
   const { data: members, loading, execute: refreshMembers } = useApi(api.getMembers, [], true)
   const { mutate: deleteMember } = useMutation(api.deleteMember)
@@ -39,6 +46,37 @@ export default function Settings() {
       })
     } finally {
       setFetchingHolidays(false)
+    }
+  }
+
+  const handlePreviewSync = async () => {
+    setPreviewing(true)
+    setPreviewData(null)
+    setSyncResult(null)
+    try {
+      const result = await api.previewCalendarSync(CALENDAR_URL)
+      setPreviewData(result)
+    } catch (err) {
+      setSyncResult({ success: false, message: err.message })
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  const handleSyncCalendar = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const result = await api.syncCalendar(CALENDAR_URL)
+      setSyncResult({
+        success: true,
+        message: `Imported ${result.imported} trips. ${result.skipped} skipped (duplicates or unmatched).`
+      })
+      setPreviewData(null)
+    } catch (err) {
+      setSyncResult({ success: false, message: err.message })
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -146,6 +184,81 @@ export default function Settings() {
           <RefreshCw className={`w-4 h-4 mr-2 ${fetchingHolidays ? 'animate-spin' : ''}`} />
           {fetchingHolidays ? 'Fetching...' : 'Fetch Federal Holidays'}
         </button>
+      </div>
+
+      {/* Calendar Sync */}
+      <div className="card">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Calendar className="w-5 h-5 mr-2" />
+          Calendar Sync
+        </h2>
+
+        {syncResult && (
+          <AlertBanner
+            type={syncResult.success ? 'success' : 'error'}
+            message={syncResult.message}
+            onDismiss={() => setSyncResult(null)}
+          />
+        )}
+
+        <p className="text-sm text-gray-600 mb-4">
+          Sync travel events from your shared Google Calendar. Events should be named like "Ivan NYC" or "Alison Paris".
+        </p>
+
+        <div className="flex space-x-2 mb-4">
+          <button
+            onClick={handlePreviewSync}
+            disabled={previewing || syncing}
+            className="btn btn-secondary flex items-center"
+          >
+            <Eye className={`w-4 h-4 mr-2 ${previewing ? 'animate-pulse' : ''}`} />
+            {previewing ? 'Loading...' : 'Preview'}
+          </button>
+          <button
+            onClick={handleSyncCalendar}
+            disabled={syncing || previewing}
+            className="btn btn-primary flex items-center"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync Now'}
+          </button>
+        </div>
+
+        {/* Preview Results */}
+        {previewData && (
+          <div className="mt-4 border rounded-lg overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2 border-b">
+              <p className="text-sm font-medium text-gray-700">
+                Preview: {previewData.will_import} of {previewData.total_events} events will be imported
+              </p>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {previewData.events?.map((event, idx) => (
+                <div key={idx} className={`px-4 py-2 border-b last:border-b-0 flex items-center justify-between ${event.will_import ? 'bg-green-50' : 'bg-gray-50'}`}>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{event.original}</p>
+                    <p className="text-xs text-gray-500">
+                      {event.departure_date} → {event.return_date}
+                    </p>
+                  </div>
+                  <div className="flex items-center">
+                    {event.will_import ? (
+                      <>
+                        <span className="text-xs text-green-600 mr-2">{event.matched_member} → {event.destination}</span>
+                        <Check className="w-4 h-4 text-green-600" />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs text-gray-400 mr-2">No match</span>
+                        <X className="w-4 h-4 text-gray-400" />
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Data Import */}
