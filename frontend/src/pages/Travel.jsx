@@ -10,10 +10,11 @@ export default function Travel() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [showIngestModal, setShowIngestModal] = useState(false)
   const [editingTrip, setEditingTrip] = useState(null)
+  const [assigningChildcare, setAssigningChildcare] = useState(null)
 
   const { data: travel, loading, execute: refreshTravel } = useApi(api.getTravel, [], true)
   const { data: members } = useApi(api.getMembers, [], true)
-  const { data: childcareNeeds } = useApi(api.getChildcareNeeds, [], true)
+  const { data: childcareNeeds, execute: refreshChildcareNeeds } = useApi(api.getChildcareNeeds, [], true)
 
   const { mutate: deleteTrip } = useMutation(api.deleteTravel)
 
@@ -83,7 +84,10 @@ export default function Travel() {
                       <span className="badge badge-red">Needs Caregiver</span>
                     </td>
                     <td className="px-4 py-3">
-                      <button className="text-sm text-primary-600 hover:text-primary-700">
+                      <button
+                        onClick={() => setAssigningChildcare(need)}
+                        className="text-sm text-primary-600 hover:text-primary-700"
+                      >
                         Assign Caregiver
                       </button>
                     </td>
@@ -143,6 +147,19 @@ export default function Travel() {
           onSave={() => {
             refreshTravel()
             setShowIngestModal(false)
+          }}
+        />
+      )}
+
+      {/* Childcare Assignment Modal */}
+      {assigningChildcare && (
+        <ChildcareModal
+          date={assigningChildcare.date}
+          members={members}
+          onClose={() => setAssigningChildcare(null)}
+          onSave={() => {
+            refreshChildcareNeeds()
+            setAssigningChildcare(null)
           }}
         />
       )}
@@ -481,6 +498,89 @@ function IngestModal({ members, onClose, onSave }) {
           </div>
         </div>
       )}
+    </Modal>
+  )
+}
+
+function ChildcareModal({ date, members, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    caregiver_id: '',
+    caregiver_name: '',
+    notes: '',
+  })
+
+  const { mutate: createChildcare, loading } = useMutation(api.createChildcare)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    await createChildcare({
+      date: date,
+      caregiver_id: formData.caregiver_id || null,
+      caregiver_name: formData.caregiver_name || members?.find(m => m.id.toString() === formData.caregiver_id)?.name,
+      notes: formData.notes,
+      status: 'confirmed'
+    })
+    onSave()
+  }
+
+  const caregivers = members?.filter(m => m.role === 'nanny' || m.role === 'parent') || []
+
+  return (
+    <Modal title="Assign Caregiver" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Assign a caregiver for <strong>{format(parseISO(date), 'EEEE, MMMM d, yyyy')}</strong>
+        </p>
+
+        <div>
+          <label className="label">Select Family Member</label>
+          <select
+            className="input"
+            value={formData.caregiver_id}
+            onChange={(e) => setFormData({ ...formData, caregiver_id: e.target.value, caregiver_name: '' })}
+          >
+            <option value="">Select...</option>
+            {caregivers.map(m => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="label">Or Enter Name</label>
+          <input
+            type="text"
+            className="input"
+            value={formData.caregiver_name}
+            onChange={(e) => setFormData({ ...formData, caregiver_name: e.target.value, caregiver_id: '' })}
+            placeholder="e.g., Grandma, Babysitter name"
+          />
+        </div>
+
+        <div>
+          <label className="label">Notes</label>
+          <textarea
+            className="input"
+            rows={2}
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            placeholder="Optional notes..."
+          />
+        </div>
+
+        <div className="flex justify-end space-x-2 pt-4">
+          <button type="button" onClick={onClose} className="btn btn-secondary">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || (!formData.caregiver_id && !formData.caregiver_name)}
+            className="btn btn-primary"
+          >
+            {loading ? 'Saving...' : 'Assign'}
+          </button>
+        </div>
+      </form>
     </Modal>
   )
 }
