@@ -108,8 +108,8 @@ export default function Dashboard() {
         </h2>
 
         <div className="flex items-center space-x-4">
-          {/* School Week Types */}
-          {schools?.map((school, idx) => (
+          {/* School Week Types - only show for schools with A/B weeks (BFS) */}
+          {schools?.filter(s => s.short_name === 'BFS').map((school, idx) => (
             <div
               key={idx}
               className="text-sm text-gray-600 flex items-center"
