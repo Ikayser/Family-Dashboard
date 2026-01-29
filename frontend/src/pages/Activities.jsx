@@ -196,11 +196,34 @@ function ActivityModal({ activity, members, onClose, onSave }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     const result = await saveActivity(formData)
+    const activityId = activity?.id || result.id
 
-    // If new activity, add schedule slots
-    if (!activity && schedule.length > 0) {
-      for (const slot of schedule) {
-        await api.addActivitySchedule(result.id, slot)
+    // Get original schedule IDs for comparison
+    const originalSlotIds = new Set(
+      (activity?.schedule || []).filter(s => s.id).map(s => s.id)
+    )
+    const currentSlotIds = new Set(
+      schedule.filter(s => s.id).map(s => s.id)
+    )
+
+    // Delete removed slots
+    for (const slotId of originalSlotIds) {
+      if (!currentSlotIds.has(slotId)) {
+        await api.deleteActivitySchedule(activityId, slotId)
+      }
+    }
+
+    // Add new slots (those without an id)
+    for (const slot of schedule) {
+      if (!slot.id) {
+        await api.addActivitySchedule(activityId, slot)
+      }
+    }
+
+    // Update existing slots that might have changed
+    for (const slot of schedule) {
+      if (slot.id && slot._modified) {
+        await api.updateActivitySchedule(activityId, slot.id, slot)
       }
     }
 
@@ -295,11 +318,39 @@ function ActivityModal({ activity, members, onClose, onSave }) {
 
           {schedule.map((slot, idx) => (
             <div key={idx} className="flex items-center space-x-2 mb-2">
-              <span className="text-sm text-gray-700">{DAYS[slot.day_of_week]}</span>
-              <span className="text-sm text-gray-500">
-                {formatTime(slot.start_time)}
-                {slot.end_time && ` - ${formatTime(slot.end_time)}`}
-              </span>
+              <select
+                className="input text-sm w-28"
+                value={slot.day_of_week}
+                onChange={(e) => {
+                  const updated = [...schedule]
+                  updated[idx] = { ...updated[idx], day_of_week: parseInt(e.target.value), _modified: true }
+                  setSchedule(updated)
+                }}
+              >
+                {DAYS.map((day, i) => (
+                  <option key={i} value={i}>{day}</option>
+                ))}
+              </select>
+              <input
+                type="time"
+                className="input text-sm w-28"
+                value={slot.start_time || ''}
+                onChange={(e) => {
+                  const updated = [...schedule]
+                  updated[idx] = { ...updated[idx], start_time: e.target.value, _modified: true }
+                  setSchedule(updated)
+                }}
+              />
+              <input
+                type="time"
+                className="input text-sm w-28"
+                value={slot.end_time || ''}
+                onChange={(e) => {
+                  const updated = [...schedule]
+                  updated[idx] = { ...updated[idx], end_time: e.target.value, _modified: true }
+                  setSchedule(updated)
+                }}
+              />
               <button
                 type="button"
                 onClick={() => removeSlot(idx)}
