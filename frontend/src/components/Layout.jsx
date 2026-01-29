@@ -23,7 +23,7 @@ export default function Layout() {
   const pendingSurveys = surveyStatus?.pending_count || 0
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 lg:flex">
       {/* Mobile header */}
       <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between no-print">
         <button
@@ -50,7 +50,7 @@ export default function Layout() {
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200
         transform transition-transform duration-200 ease-in-out
-        lg:translate-x-0 lg:static lg:z-auto
+        lg:translate-x-0 lg:static lg:z-auto lg:flex-shrink-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         no-print
       `}>
@@ -108,7 +108,7 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="lg:pl-64">
+      <main className="flex-1 min-w-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <Outlet />
         </div>
