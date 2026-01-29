@@ -159,9 +159,100 @@ router.post('/responses', async (req, res, next) => {
       [question_id, week_start_date]
     );
 
-    // Auto-parse if it's the "other" category question
+    // Auto-parse based on question category
     let parseResult = null;
     console.log('Survey response - question category:', question?.category, 'response_text:', response_text?.substring(0, 100));
+
+    // Handle childcare category - create childcare records
+    if (question?.category === 'childcare' && response_text?.trim()) {
+      try {
+        console.log('Auto-parsing childcare response...');
+        const membersResult = await db.query('SELECT * FROM family_members');
+        const members = membersResult.rows;
+        const memberMap = {};
+        members.forEach(m => { memberMap[m.name.toLowerCase()] = m; });
+
+        const dayMap = {
+          'sunday': 0, 'sun': 0,
+          'monday': 1, 'mon': 1,
+          'tuesday': 2, 'tue': 2, 'tues': 2,
+          'wednesday': 3, 'wed': 3,
+          'thursday': 4, 'thu': 4, 'thurs': 4,
+          'friday': 5, 'fri': 5,
+          'saturday': 6, 'sat': 6
+        };
+
+        const lowerText = response_text.toLowerCase();
+        const parsed = [];
+
+        // Find caregiver name in response
+        let caregiver = null;
+        for (const [name, member] of Object.entries(memberMap)) {
+          if (lowerText.includes(name)) {
+            caregiver = member;
+            break;
+          }
+        }
+
+        // Find days mentioned
+        const daysFound = [];
+        for (const [dayName, dayNum] of Object.entries(dayMap)) {
+          if (lowerText.includes(dayName)) {
+            if (!daysFound.includes(dayNum)) {
+              daysFound.push(dayNum);
+            }
+          }
+        }
+
+        // If no specific days mentioned, try to cover all days both parents are away
+        if (daysFound.length === 0) {
+          // Get days where both parents are traveling this week
+          const weekStart = new Date(week_start_date);
+          for (let i = 0; i < 7; i++) {
+            daysFound.push(i);
+          }
+        }
+
+        // Create childcare records
+        if (caregiver || response_text.trim()) {
+          const weekStart = new Date(week_start_date);
+          for (const dayNum of daysFound) {
+            const date = new Date(weekStart);
+            date.setDate(date.getDate() + dayNum);
+            const dateStr = format(date, 'yyyy-MM-dd');
+
+            try {
+              // Check if childcare already exists for this date
+              const existing = await db.query('SELECT id FROM childcare WHERE date = $1', [dateStr]);
+              if (existing.rows.length > 0) {
+                // Update existing
+                await db.query(
+                  `UPDATE childcare SET caregiver_id = $1, caregiver_name = $2, notes = $3, source = 'survey' WHERE date = $4`,
+                  [caregiver?.id || null, caregiver?.name || response_text.trim(), `From survey: ${response_text}`, dateStr]
+                );
+              } else {
+                // Insert new
+                await db.query(
+                  `INSERT INTO childcare (date, caregiver_id, caregiver_name, notes, source)
+                   VALUES ($1, $2, $3, $4, 'survey')`,
+                  [dateStr, caregiver?.id || null, caregiver?.name || response_text.trim(), `From survey: ${response_text}`]
+                );
+              }
+              parsed.push({ type: 'childcare', date: dateStr, caregiver: caregiver?.name || response_text.trim() });
+              console.log('Created childcare record for', dateStr, 'with', caregiver?.name || response_text);
+            } catch (e) {
+              console.error('Childcare insert error for', dateStr, ':', e.message);
+            }
+          }
+        }
+
+        parseResult = parsed;
+      } catch (parseErr) {
+        console.error('Childcare parse error:', parseErr);
+      }
+    }
+
+    // Handle "other" category - parse activities and travel
     if (question?.category === 'other' && response_text?.trim()) {
       try {
         console.log('Auto-parsing "other" category response...');
