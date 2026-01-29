@@ -80,7 +80,7 @@ function DayCard({ day }) {
         </div>
       ))}
 
-      {/* Activities */}
+      {/* Activities (recurring) */}
       {day.activities?.slice(0, 3).map((activity, idx) => (
         <div
           key={idx}
@@ -93,9 +93,22 @@ function DayCard({ day }) {
         </div>
       ))}
 
-      {day.activities?.length > 3 && (
+      {/* Activity instances (one-off from survey, etc.) */}
+      {day.activity_instances?.map((instance, idx) => (
+        <div
+          key={`instance-${idx}`}
+          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
+          style={{ backgroundColor: `${instance.color || instance.member_color}20` }}
+          title={`${instance.member_name}: ${instance.activity_name} ${instance.start_time ? `at ${instance.start_time}` : ''}`}
+        >
+          <Calendar className="w-3 h-3 mr-1 flex-shrink-0 text-gray-500" />
+          <span className="truncate">{instance.activity_name}</span>
+        </div>
+      ))}
+
+      {((day.activities?.length || 0) + (day.activity_instances?.length || 0)) > 3 && (
         <div className="text-xs text-gray-500">
-          +{day.activities.length - 3} more
+          +{(day.activities?.length || 0) + (day.activity_instances?.length || 0) - 3} more
         </div>
       )}
 

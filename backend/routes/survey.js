@@ -161,26 +161,31 @@ router.post('/responses', async (req, res, next) => {
 
     // Auto-parse if it's the "other" category question
     let parseResult = null;
+    console.log('Survey response - question category:', question?.category, 'response_text:', response_text?.substring(0, 100));
     if (question?.category === 'other' && response_text?.trim()) {
       try {
+        console.log('Auto-parsing "other" category response...');
         // Call the parse logic inline
         const membersResult = await db.query('SELECT * FROM family_members');
         const members = membersResult.rows;
         const memberMap = {};
         members.forEach(m => { memberMap[m.name.toLowerCase()] = m; });
+        console.log('Family members for matching:', Object.keys(memberMap));
 
         const parsed = [];
         const lines = response_text.split(/[,\n;]+/).map(l => l.trim()).filter(l => l);
 
         for (const line of lines) {
           const lowerLine = line.toLowerCase();
+          console.log('Parsing line:', line);
 
-          // Travel detection
+          // Travel detection - "Name going/traveling/trip to destination"
           const travelMatch = lowerLine.match(/(\w+)\s+(?:going|traveling|trip|flying|visiting)\s+(?:to\s+)?(.+)/i);
           if (travelMatch) {
             const name = travelMatch[1];
             const destination = travelMatch[2].trim();
             const member = memberMap[name];
+            console.log('Travel match - name:', name, 'found member:', !!member);
             if (member) {
               const weekStart = new Date(week_start_date);
               const weekEnd = new Date(weekStart);
@@ -191,14 +196,27 @@ router.post('/responses', async (req, res, next) => {
                 [member.id, destination, format(weekStart, 'yyyy-MM-dd'), format(weekEnd, 'yyyy-MM-dd'), `From survey: ${line}`]
               );
               parsed.push({ type: 'travel', member: member.name, details: destination });
+              console.log('Created travel record for', member.name, 'to', destination);
               continue;
             }
           }
 
-          // Activity detection
+          // Activity detection - look for any family member name
+          let foundActivity = false;
           for (const [name, member] of Object.entries(memberMap)) {
             if (lowerLine.includes(name)) {
-              const activityName = line.replace(new RegExp(name, 'i'), '').replace(/^\s*(?:has|is doing|goes to|at)?\s*/i, '').trim();
+              // Extract activity by removing member name and common words
+              let activityName = line
+                .replace(new RegExp(name, 'gi'), '')
+                .replace(/^\s*(?:has|is doing|goes to|at|for|'s|-)?\s*/i, '')
+                .replace(/\s*(?:has|is doing|goes to|at|for|-)\s*$/i, '')
+                .trim();
+
+              // Clean up possessives and punctuation
+              activityName = activityName.replace(/^['']s?\s*/i, '').replace(/\s*['']s?$/i, '').trim();
+
+              console.log('Activity match - member:', name, 'activity:', activityName);
+
               if (activityName && activityName.length > 2) {
                 let activityResult = await db.query(
                   `SELECT * FROM activities WHERE member_id = $1 AND LOWER(name) = LOWER($2)`,
@@ -211,19 +229,33 @@ router.post('/responses', async (req, res, next) => {
                     [member.id, activityName]
                   );
                   activityId = newActivity.rows[0].id;
+                  console.log('Created new activity:', activityName, 'id:', activityId);
                 } else {
                   activityId = activityResult.rows[0].id;
+                  console.log('Found existing activity:', activityName, 'id:', activityId);
                 }
-                const weekStart = new Date(week_start_date);
-                weekStart.setDate(weekStart.getDate() + 5);
-                await db.query(
-                  `INSERT INTO activity_instances (activity_id, date, status, notes, source) VALUES ($1, $2, 'scheduled', $3, 'survey') ON CONFLICT DO NOTHING`,
-                  [activityId, format(weekStart, 'yyyy-MM-dd'), `From survey: ${line}`]
+
+                // Create instance for Saturday of this week
+                const instanceDate = new Date(week_start_date);
+                instanceDate.setDate(instanceDate.getDate() + 5);
+                const dateStr = format(instanceDate, 'yyyy-MM-dd');
+
+                const instanceResult = await db.query(
+                  `INSERT INTO activity_instances (activity_id, date, status, notes, source)
+                   VALUES ($1, $2, 'scheduled', $3, 'survey') RETURNING *`,
+                  [activityId, dateStr, `From survey: ${line}`]
                 );
-                parsed.push({ type: 'activity', member: member.name, details: activityName });
+                console.log('Created activity instance for', dateStr, '- id:', instanceResult.rows[0]?.id);
+
+                parsed.push({ type: 'activity', member: member.name, details: activityName, date: dateStr });
+                foundActivity = true;
                 break;
               }
             }
+          }
+
+          if (!foundActivity && !travelMatch) {
+            console.log('No pattern matched for line:', line);
           }
         }
         parseResult = parsed;

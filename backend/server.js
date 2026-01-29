@@ -13,14 +13,22 @@ const holidaysRoutes = require('./routes/holidays');
 const surveyRoutes = require('./routes/survey');
 const dashboardRoutes = require('./routes/dashboard');
 const ingestRoutes = require('./routes/ingest');
+const calendarRoutes = require('./routes/calendar');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// Middleware - CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    // Allow all origins for now
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -38,6 +46,7 @@ app.use('/api/holidays', holidaysRoutes);
 app.use('/api/survey', surveyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ingest', ingestRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
