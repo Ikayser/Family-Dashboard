@@ -128,10 +128,10 @@ router.get('/week', async (req, res, next) => {
       const dateStr = format(date, 'yyyy-MM-dd');
       const dayOfWeek = getDay(date);
 
-      // Get travel for this day
+      // Get travel for this day - format dates for comparison (DB returns ISO timestamp)
       const dayTravel = travelResult.rows.filter(t => {
-        const depDate = t.departure_date;
-        const retDate = t.return_date || t.departure_date;
+        const depDate = format(new Date(t.departure_date), 'yyyy-MM-dd');
+        const retDate = format(new Date(t.return_date || t.departure_date), 'yyyy-MM-dd');
         return dateStr >= depDate && dateStr <= retDate;
       });
 
@@ -144,9 +144,9 @@ router.get('/week', async (req, res, next) => {
         a.day_of_week === dayOfWeek
       );
 
-      // Get activity instances for this day
+      // Get activity instances for this day - format date for comparison
       const dayInstances = activityInstancesResult.rows.filter(i =>
-        i.date === dateStr
+        format(new Date(i.date), 'yyyy-MM-dd') === dateStr
       );
 
       // Check for cancellations
@@ -159,14 +159,14 @@ router.get('/week', async (req, res, next) => {
         !cancelledActivityIds.includes(a.id)
       );
 
-      // Get holidays
-      const dayHoliday = holidaysResult.rows.find(h => h.date === dateStr);
+      // Get holidays - format date for comparison (DB returns ISO timestamp)
+      const dayHoliday = holidaysResult.rows.find(h => format(new Date(h.date), 'yyyy-MM-dd') === dateStr);
 
-      // Get school days off
-      const daySchoolOff = schoolDaysOffResult.rows.filter(s => s.date === dateStr);
+      // Get school days off - format date for comparison (DB returns ISO timestamp)
+      const daySchoolOff = schoolDaysOffResult.rows.filter(s => format(new Date(s.date), 'yyyy-MM-dd') === dateStr);
 
-      // Get childcare
-      const dayChildcare = childcareResult.rows.find(c => c.date === dateStr);
+      // Get childcare - format date for comparison (DB returns ISO timestamp)
+      const dayChildcare = childcareResult.rows.find(c => format(new Date(c.date), 'yyyy-MM-dd') === dateStr);
 
       return {
         date: dateStr,
