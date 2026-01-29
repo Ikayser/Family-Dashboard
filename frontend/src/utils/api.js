@@ -126,6 +126,15 @@ export const api = {
     fetchAPI(`/survey/skip/${id}`, { method: 'POST' }),
   getSurveyStatus: () => fetchAPI('/survey/status'),
 
+  // Calendar
+  getCalendarSettings: () => fetchAPI('/calendar/settings'),
+  saveCalendarSettings: (data) =>
+    fetchAPI('/calendar/settings', { method: 'POST', body: data }),
+  previewCalendarSync: (calendar_url) =>
+    fetchAPI('/calendar/preview', { method: 'POST', body: { calendar_url } }),
+  syncCalendar: (calendar_url) =>
+    fetchAPI('/calendar/sync', { method: 'POST', body: { calendar_url } }),
+
   // Ingest
   parseFlightItinerary: (text, source = 'text') =>
     fetchAPI('/ingest/flight-itinerary', { method: 'POST', body: { text, source } }),
