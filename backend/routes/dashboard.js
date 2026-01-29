@@ -148,9 +148,10 @@ router.get('/week', async (req, res, next) => {
         return dateStr >= depDate && dateStr <= retDate;
       });
 
-      // Check if both parents are traveling
+      // Check if both parents are traveling (count distinct parent IDs)
       const parentsTraveling = dayTravel.filter(t => t.role === 'parent');
-      const bothParentsAway = parentsTraveling.length >= 2;
+      const distinctParentIds = new Set(parentsTraveling.map(t => t.member_id));
+      const bothParentsAway = distinctParentIds.size >= 2;
 
       // Get activities for this day
       const dayActivities = activitiesResult.rows.filter(a =>
