@@ -489,4 +489,38 @@ router.get('/status', async (req, res, next) => {
   }
 });
 
+// Reset surveys for current week (delete responses and reset pending status)
+router.post('/reset', async (req, res, next) => {
+  try {
+    const today = new Date();
+    const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+
+    // Delete survey responses for this week
+    const deletedResponses = await db.query(
+      `DELETE FROM survey_responses WHERE week_start_date = $1 RETURNING *`,
+      [weekStart]
+    );
+
+    // Reset pending surveys back to 'pending' status
+    const resetPending = await db.query(
+      `UPDATE pending_surveys
+       SET status = 'pending', answered_at = NULL
+       WHERE for_week_start = $1
+       RETURNING *`,
+      [weekStart]
+    );
+
+    console.log(`Reset surveys for week ${weekStart}: deleted ${deletedResponses.rowCount} responses, reset ${resetPending.rowCount} pending surveys`);
+
+    res.json({
+      message: 'Survey reset successful',
+      week_start: weekStart,
+      responses_deleted: deletedResponses.rowCount,
+      surveys_reset: resetPending.rowCount
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
