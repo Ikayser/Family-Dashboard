@@ -1,6 +1,25 @@
 import React from 'react'
 import { format, parseISO, isToday } from 'date-fns'
-import { Plane, Calendar, AlertTriangle, Sun, Users, BookOpen } from 'lucide-react'
+import { Plane, Calendar, AlertTriangle, Sun, Users, BookOpen, Clock } from 'lucide-react'
+
+// Helper to format time for display (e.g., "09:00:00" -> "9am", "14:30:00" -> "2:30pm")
+function formatTime(timeStr) {
+  if (!timeStr) return null
+  const [hours, minutes] = timeStr.split(':').map(Number)
+  const period = hours >= 12 ? 'pm' : 'am'
+  const displayHour = hours % 12 || 12
+  if (minutes === 0) {
+    return `${displayHour}${period}`
+  }
+  return `${displayHour}:${minutes.toString().padStart(2, '0')}${period}`
+}
+
+// Helper to convert time string to minutes for sorting
+function timeToMinutes(timeStr) {
+  if (!timeStr) return 9999 // Items without time go to end
+  const [hours, minutes] = timeStr.split(':').map(Number)
+  return hours * 60 + minutes
+}
 
 export default function WeekView({ days, members }) {
   return (
@@ -54,8 +73,11 @@ function DayCard({ day }) {
         </div>
       ))}
 
-      {/* School specials (Week A/B) */}
-      {day.school_specials?.map((special, idx) => (
+      {/* School specials (Week A/B) - sorted by time */}
+      {day.school_specials
+        ?.slice()
+        .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
+        .map((special, idx) => (
         <div
           key={`special-${idx}`}
           className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
@@ -63,6 +85,9 @@ function DayCard({ day }) {
           title={`${special.student_name}: ${special.activity_name}`}
         >
           <BookOpen className="w-3 h-3 mr-1 flex-shrink-0 text-gray-500" />
+          {special.start_time && (
+            <span className="text-gray-500 mr-1 flex-shrink-0">{formatTime(special.start_time)}</span>
+          )}
           <span className="truncate">{special.activity_name}</span>
         </div>
       ))}
@@ -80,37 +105,50 @@ function DayCard({ day }) {
         </div>
       ))}
 
-      {/* Activities (recurring) */}
-      {day.activities?.slice(0, 3).map((activity, idx) => (
-        <div
-          key={idx}
-          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
-          style={{ backgroundColor: `${activity.color || activity.member_color}20` }}
-          title={`${activity.member_name}: ${activity.name} ${activity.start_time ? `at ${activity.start_time}` : ''}`}
-        >
-          <Calendar className="w-3 h-3 mr-1 flex-shrink-0 text-gray-500" />
-          <span className="truncate">{activity.name}</span>
-        </div>
-      ))}
+      {/* Combined activities and instances - sorted by start time */}
+      {(() => {
+        const allEvents = [
+          ...(day.activities || []).map(a => ({
+            ...a,
+            eventType: 'activity',
+            displayName: a.name,
+            sortTime: a.start_time
+          })),
+          ...(day.activity_instances || []).map(i => ({
+            ...i,
+            eventType: 'instance',
+            displayName: i.activity_name,
+            sortTime: i.start_time
+          }))
+        ].sort((a, b) => timeToMinutes(a.sortTime) - timeToMinutes(b.sortTime))
 
-      {/* Activity instances (one-off from survey, etc.) */}
-      {day.activity_instances?.map((instance, idx) => (
-        <div
-          key={`instance-${idx}`}
-          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
-          style={{ backgroundColor: `${instance.color || instance.member_color}20` }}
-          title={`${instance.member_name}: ${instance.activity_name} ${instance.start_time ? `at ${instance.start_time}` : ''}`}
-        >
-          <Calendar className="w-3 h-3 mr-1 flex-shrink-0 text-gray-500" />
-          <span className="truncate">{instance.activity_name}</span>
-        </div>
-      ))}
+        const visibleEvents = allEvents.slice(0, 4)
+        const hiddenCount = allEvents.length - visibleEvents.length
 
-      {((day.activities?.length || 0) + (day.activity_instances?.length || 0)) > 3 && (
-        <div className="text-xs text-gray-500">
-          +{(day.activities?.length || 0) + (day.activity_instances?.length || 0) - 3} more
-        </div>
-      )}
+        return (
+          <>
+            {visibleEvents.map((event, idx) => (
+              <div
+                key={`event-${idx}`}
+                className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
+                style={{ backgroundColor: `${event.color || event.member_color}20` }}
+                title={`${event.member_name}: ${event.displayName}${event.sortTime ? ` at ${formatTime(event.sortTime)}` : ''}`}
+              >
+                <Calendar className="w-3 h-3 mr-1 flex-shrink-0 text-gray-500" />
+                {event.sortTime && (
+                  <span className="text-gray-500 mr-1 flex-shrink-0">{formatTime(event.sortTime)}</span>
+                )}
+                <span className="truncate">{event.displayName}</span>
+              </div>
+            ))}
+            {hiddenCount > 0 && (
+              <div className="text-xs text-gray-500">
+                +{hiddenCount} more
+              </div>
+            )}
+          </>
+        )
+      })()}
 
       {/* Childcare */}
       {day.childcare && (
