@@ -77,6 +77,10 @@ export const api = {
   deleteActivity: (id) => fetchAPI(`/activities/${id}`, { method: 'DELETE' }),
   addActivitySchedule: (activityId, data) =>
     fetchAPI(`/activities/${activityId}/schedule`, { method: 'POST', body: data }),
+  updateActivitySchedule: (activityId, scheduleId, data) =>
+    fetchAPI(`/activities/${activityId}/schedule/${scheduleId}`, { method: 'PUT', body: data }),
+  deleteActivitySchedule: (activityId, scheduleId) =>
+    fetchAPI(`/activities/${activityId}/schedule/${scheduleId}`, { method: 'DELETE' }),
   addActivityInstance: (activityId, data) =>
     fetchAPI(`/activities/${activityId}/instances`, { method: 'POST', body: data }),
   getActivitiesForRange: (startDate, endDate) =>
