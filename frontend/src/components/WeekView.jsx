@@ -1,4 +1,5 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { format, parseISO, isToday } from 'date-fns'
 import { Plane, Calendar, AlertTriangle, Sun, Users, BookOpen, Clock } from 'lucide-react'
 
@@ -61,15 +62,16 @@ function DayCard({ day }) {
 
       {/* Travel - always at top */}
       {day.travel?.map((trip, idx) => (
-        <div
+        <Link
           key={idx}
-          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
+          to="/travel"
+          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center hover:opacity-80 cursor-pointer"
           style={{ backgroundColor: `${trip.member_color}20`, color: trip.member_color }}
           title={`${trip.member_name}: ${trip.destination || 'Traveling'}`}
         >
           <Plane className="w-3 h-3 mr-1 flex-shrink-0" />
           <span className="truncate">{trip.member_name}: {trip.destination}</span>
-        </div>
+        </Link>
       ))}
 
       {/* Holiday */}
@@ -81,9 +83,9 @@ function DayCard({ day }) {
 
       {/* School days off */}
       {day.school_days_off?.map((sdo, idx) => (
-        <div key={idx} className="mb-1 text-xs bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded truncate">
+        <Link key={idx} to="/schools" className="block mb-1 text-xs bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded truncate hover:opacity-80 cursor-pointer">
           {sdo.school_name}: {sdo.name || 'No School'}
-        </div>
+        </Link>
       ))}
 
       {/* School specials (Week A/B) - sorted by time */}
@@ -91,9 +93,10 @@ function DayCard({ day }) {
         ?.slice()
         .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
         .map((special, idx) => (
-        <div
+        <Link
           key={`special-${idx}`}
-          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
+          to="/schools"
+          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center hover:opacity-80 cursor-pointer"
           style={{ backgroundColor: `${special.student_color}15`, borderLeft: `2px solid ${special.student_color}` }}
           title={`${special.student_name}: ${special.activity_name}`}
         >
@@ -102,7 +105,7 @@ function DayCard({ day }) {
             <span className="text-gray-500 mr-1 flex-shrink-0">{formatTime(special.start_time)}</span>
           )}
           <span className="truncate">{special.activity_name}</span>
-        </div>
+        </Link>
       ))}
 
       {/* Combined activities and instances - sorted by start time */}
@@ -128,9 +131,10 @@ function DayCard({ day }) {
         return (
           <>
             {visibleEvents.map((event, idx) => (
-              <div
+              <Link
                 key={`event-${idx}`}
-                className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center"
+                to="/activities"
+                className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center hover:opacity-80 cursor-pointer"
                 style={{ backgroundColor: `${event.color || event.member_color}20` }}
                 title={`${event.member_name}: ${event.displayName}${event.sortTime ? ` at ${formatTime(event.sortTime)}` : ''}`}
               >
@@ -139,12 +143,12 @@ function DayCard({ day }) {
                   <span className="text-gray-500 mr-1 flex-shrink-0">{formatTime(event.sortTime)}</span>
                 )}
                 <span className="truncate">{event.displayName}</span>
-              </div>
+              </Link>
             ))}
             {hiddenCount > 0 && (
-              <div className="text-xs text-gray-500">
+              <Link to="/activities" className="text-xs text-gray-500 hover:text-gray-700">
                 +{hiddenCount} more
-              </div>
+              </Link>
             )}
           </>
         )
