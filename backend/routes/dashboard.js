@@ -25,7 +25,8 @@ router.get('/week', async (req, res, next) => {
       activitiesResult,
       activityInstancesResult,
       childcareResult,
-      surveyStatusResult
+      surveyStatusResult,
+      schoolScheduleResult
     ] = await Promise.all([
       // Family members
       db.query('SELECT * FROM family_members ORDER BY role, name'),
@@ -95,7 +96,19 @@ router.get('/week', async (req, res, next) => {
           COUNT(*) FILTER (WHERE status = 'pending') as pending_count
         FROM pending_surveys
         WHERE for_week_start = $1
-      `, [startDate])
+      `, [startDate]),
+
+      // School schedules (Week A/B specials)
+      db.query(`
+        SELECT sch.*, ss.member_id, ss.current_week_type, ss.week_type_start_date,
+               fm.name as student_name, fm.color as student_color,
+               s.short_name as school_name
+        FROM school_schedule sch
+        JOIN student_schools ss ON sch.student_school_id = ss.id
+        JOIN family_members fm ON ss.member_id = fm.id
+        JOIN schools s ON ss.school_id = s.id
+        ORDER BY sch.day_of_week, sch.start_time, fm.name
+      `)
     ]);
 
     // Get school info with current week type
@@ -168,6 +181,21 @@ router.get('/week', async (req, res, next) => {
       // Get childcare - format date for comparison (DB returns ISO timestamp)
       const dayChildcare = childcareResult.rows.find(c => format(new Date(c.date), 'yyyy-MM-dd') === dateStr);
 
+      // Get school specials for this day based on calculated week type
+      const daySchoolSpecials = schoolScheduleResult.rows.filter(sch => {
+        if (sch.day_of_week !== dayOfWeek) return false;
+
+        // Calculate the week type for this student for the current week
+        if (!sch.week_type_start_date) return false;
+        const startDateObj = new Date(sch.week_type_start_date);
+        const weeksDiff = Math.floor((weekStart - startDateObj) / (7 * 24 * 60 * 60 * 1000));
+        const calculatedWeekType = weeksDiff % 2 === 0
+          ? sch.current_week_type
+          : (sch.current_week_type === 'A' ? 'B' : 'A');
+
+        return sch.week_type === calculatedWeekType;
+      });
+
       return {
         date: dateStr,
         day_name: format(date, 'EEEE'),
@@ -178,6 +206,7 @@ router.get('/week', async (req, res, next) => {
         activity_instances: dayInstances.filter(i => i.status !== 'cancelled'),
         holiday: dayHoliday,
         school_days_off: daySchoolOff,
+        school_specials: daySchoolSpecials,
         childcare: dayChildcare,
         both_parents_away: bothParentsAway,
         needs_childcare: bothParentsAway && !dayChildcare
