@@ -66,7 +66,7 @@ export default function Schools() {
 }
 
 function SchoolCard({ school, onAddDayOff, onManageSchedule, onRefresh }) {
-  const [showDaysOff, setShowDaysOff] = useState(false)
+  const [showDaysOff, setShowDaysOff] = useState(true) // Expanded by default
   const { data: schoolDetails } = useApi(
     () => api.getSchool(school.id),
     [school.id],
@@ -74,6 +74,14 @@ function SchoolCard({ school, onAddDayOff, onManageSchedule, onRefresh }) {
   )
 
   const students = school.students?.filter(s => s.student_id) || []
+
+  // Filter to only show future days off (today and onwards)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const futureDaysOff = schoolDetails?.days_off?.filter(dayOff => {
+    const dayOffDate = parseISO(dayOff.date)
+    return dayOffDate >= today
+  }) || []
 
   return (
     <div className="card">
@@ -164,7 +172,7 @@ function SchoolCard({ school, onAddDayOff, onManageSchedule, onRefresh }) {
           </div>
         </div>
 
-        {schoolDetails?.days_off?.slice(0, showDaysOff ? undefined : 3).map((dayOff, idx) => (
+        {futureDaysOff.slice(0, showDaysOff ? undefined : 3).map((dayOff, idx) => (
           <div
             key={idx}
             className="flex items-center justify-between py-1 text-sm"
@@ -176,8 +184,8 @@ function SchoolCard({ school, onAddDayOff, onManageSchedule, onRefresh }) {
           </div>
         ))}
 
-        {(!schoolDetails?.days_off || schoolDetails.days_off.length === 0) && (
-          <p className="text-sm text-gray-400">No days off recorded</p>
+        {futureDaysOff.length === 0 && (
+          <p className="text-sm text-gray-400">No upcoming days off</p>
         )}
       </div>
     </div>

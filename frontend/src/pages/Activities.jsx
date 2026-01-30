@@ -199,11 +199,12 @@ function ActivityModal({ activity, members, onClose, onSave }) {
   )
   const [newSlot, setNewSlot] = useState({ day_of_week: '', start_time: '', end_time: '' })
 
-  // One-time activity fields
+  // One-time activity fields - populate from existing instance if editing
+  const firstInstance = activity?.recent_instances?.[0]
   const [oneTimeData, setOneTimeData] = useState({
-    date: '',
-    start_time: '',
-    end_time: ''
+    date: firstInstance?.date || '',
+    start_time: firstInstance?.start_time || '',
+    end_time: firstInstance?.end_time || ''
   })
 
   const { mutate: saveActivity, loading: savingActivity } = useMutation(
@@ -285,7 +286,15 @@ function ActivityModal({ activity, members, onClose, onSave }) {
             <select
               className="input"
               value={formData.member_id}
-              onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
+              onChange={(e) => {
+                const selectedMember = children.find(m => m.id.toString() === e.target.value)
+                setFormData({
+                  ...formData,
+                  member_id: e.target.value,
+                  // Default color to member's color if selecting a member
+                  color: selectedMember?.color || formData.color
+                })
+              }}
             >
               <option value="">None / Family</option>
               {children.map(m => (
@@ -324,12 +333,36 @@ function ActivityModal({ activity, members, onClose, onSave }) {
           </div>
           <div>
             <label className="label">Color</label>
-            <input
-              type="color"
-              className="input h-10"
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-            />
+            <div className="flex flex-wrap gap-2">
+              {/* Member colors */}
+              {children.map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, color: m.color })}
+                  className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-white text-xs font-bold ${
+                    formData.color === m.color ? 'border-gray-900 ring-2 ring-offset-1 ring-gray-400' : 'border-transparent'
+                  }`}
+                  style={{ backgroundColor: m.color }}
+                  title={m.name}
+                >
+                  {m.name.charAt(0)}
+                </button>
+              ))}
+              {/* Additional preset colors */}
+              {['#10B981', '#6366F1', '#EF4444'].map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, color })}
+                  className={`w-8 h-8 rounded-full border-2 ${
+                    formData.color === color ? 'border-gray-900 ring-2 ring-offset-1 ring-gray-400' : 'border-transparent'
+                  }`}
+                  style={{ backgroundColor: color }}
+                  title={color === '#10B981' ? 'Green' : color === '#6366F1' ? 'Indigo' : 'Red'}
+                />
+              ))}
+            </div>
           </div>
         </div>
 

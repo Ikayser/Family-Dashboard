@@ -7,9 +7,11 @@ router.get('/', async (req, res, next) => {
   try {
     const { startDate, endDate, memberId } = req.query;
     let query = `
-      SELECT t.*, fm.name as member_name, fm.color as member_color
+      SELECT t.*,
+             COALESCE(fm.name, t.other_traveler_name) as member_name,
+             COALESCE(fm.color, '#6B7280') as member_color
       FROM travel t
-      JOIN family_members fm ON t.member_id = fm.id
+      LEFT JOIN family_members fm ON t.member_id = fm.id
       WHERE 1=1
     `;
     const params = [];
@@ -40,9 +42,9 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT t.*, fm.name as member_name
+      `SELECT t.*, COALESCE(fm.name, t.other_traveler_name) as member_name
        FROM travel t
-       JOIN family_members fm ON t.member_id = fm.id
+       LEFT JOIN family_members fm ON t.member_id = fm.id
        WHERE t.id = $1`,
       [req.params.id]
     );
@@ -59,19 +61,19 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const {
-      member_id, destination, departure_date, departure_time,
+      member_id, other_traveler_name, destination, departure_date, departure_time,
       return_date, return_time, flight_number, airline,
       confirmation_code, notes, source
     } = req.body;
 
     const result = await db.query(
       `INSERT INTO travel (
-        member_id, destination, departure_date, departure_time,
+        member_id, other_traveler_name, destination, departure_date, departure_time,
         return_date, return_time, flight_number, airline,
         confirmation_code, notes, source
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
-      [member_id, destination, departure_date, departure_time,
+      [member_id || null, other_traveler_name || null, destination, departure_date, departure_time,
        return_date, return_time, flight_number, airline,
        confirmation_code, notes, source || 'manual']
     );
@@ -85,26 +87,27 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const {
-      member_id, destination, departure_date, departure_time,
+      member_id, other_traveler_name, destination, departure_date, departure_time,
       return_date, return_time, flight_number, airline,
       confirmation_code, notes
     } = req.body;
 
     const result = await db.query(
       `UPDATE travel SET
-        member_id = COALESCE($1, member_id),
-        destination = COALESCE($2, destination),
-        departure_date = COALESCE($3, departure_date),
-        departure_time = COALESCE($4, departure_time),
-        return_date = COALESCE($5, return_date),
-        return_time = COALESCE($6, return_time),
-        flight_number = COALESCE($7, flight_number),
-        airline = COALESCE($8, airline),
-        confirmation_code = COALESCE($9, confirmation_code),
-        notes = COALESCE($10, notes)
-      WHERE id = $11
+        member_id = $1,
+        other_traveler_name = $2,
+        destination = COALESCE($3, destination),
+        departure_date = COALESCE($4, departure_date),
+        departure_time = COALESCE($5, departure_time),
+        return_date = COALESCE($6, return_date),
+        return_time = COALESCE($7, return_time),
+        flight_number = COALESCE($8, flight_number),
+        airline = COALESCE($9, airline),
+        confirmation_code = COALESCE($10, confirmation_code),
+        notes = COALESCE($11, notes)
+      WHERE id = $12
       RETURNING *`,
-      [member_id, destination, departure_date, departure_time,
+      [member_id || null, other_traveler_name || null, destination, departure_date, departure_time,
        return_date, return_time, flight_number, airline,
        confirmation_code, notes, req.params.id]
     );

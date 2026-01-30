@@ -92,21 +92,30 @@ function DayCard({ day }) {
       {day.school_specials
         ?.slice()
         .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
-        .map((special, idx) => (
-        <Link
-          key={`special-${idx}`}
-          to="/schools"
-          className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center hover:opacity-80 cursor-pointer"
-          style={{ backgroundColor: `${special.student_color}15`, borderLeft: `2px solid ${special.student_color}` }}
-          title={`${special.student_name}: ${special.activity_name}`}
-        >
-          <BookOpen className="w-3 h-3 mr-1 flex-shrink-0 text-gray-500" />
-          {special.start_time && (
-            <span className="text-gray-500 mr-1 flex-shrink-0">{formatTime(special.start_time)}</span>
-          )}
-          <span className="truncate">{special.activity_name}</span>
-        </Link>
-      ))}
+        .map((special, idx) => {
+          // Get first letter of student name (e.g., "L" for Lola)
+          const studentInitial = special.student_name?.charAt(0)?.toUpperCase()
+          return (
+            <Link
+              key={`special-${idx}`}
+              to="/schools"
+              className="mb-1 text-xs px-1.5 py-0.5 rounded truncate flex items-center hover:opacity-80 cursor-pointer"
+              style={{ backgroundColor: `${special.student_color}15`, borderLeft: `2px solid ${special.student_color}` }}
+              title={`${special.student_name}: ${special.activity_name}`}
+            >
+              <span
+                className="w-4 h-4 rounded-full flex items-center justify-center mr-1 flex-shrink-0 text-[10px] font-bold text-white"
+                style={{ backgroundColor: special.student_color }}
+              >
+                {studentInitial}
+              </span>
+              {special.start_time && (
+                <span className="text-gray-500 mr-1 flex-shrink-0">{formatTime(special.start_time)}</span>
+              )}
+              <span className="truncate">{special.activity_name}</span>
+            </Link>
+          )
+        })}
 
       {/* Combined activities and instances - sorted by start time */}
       {(() => {

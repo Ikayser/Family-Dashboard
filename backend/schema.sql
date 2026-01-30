@@ -216,6 +216,9 @@ INSERT INTO survey_questions (question_text, question_type, category, recurring,
     ('Anything else? (Add activities, travel, notes - I''ll parse it!)', 'text', 'other', TRUE, 'weekly')
 ON CONFLICT DO NOTHING;
 
+-- Add other_traveler_name for non-family travelers
+ALTER TABLE travel ADD COLUMN IF NOT EXISTS other_traveler_name VARCHAR(255);
+
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_travel_dates ON travel(departure_date, return_date);
 CREATE INDEX IF NOT EXISTS idx_travel_member ON travel(member_id);

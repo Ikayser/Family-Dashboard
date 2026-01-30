@@ -17,7 +17,18 @@ router.get('/', async (req, res, next) => {
                'end_time', s.end_time,
                'effective_from', s.effective_from,
                'effective_until', s.effective_until
-             )) FILTER (WHERE s.id IS NOT NULL) as schedule
+             )) FILTER (WHERE s.id IS NOT NULL) as schedule,
+             (SELECT json_agg(jsonb_build_object(
+               'id', ai.id,
+               'date', ai.date,
+               'start_time', ai.start_time,
+               'end_time', ai.end_time,
+               'status', ai.status
+             ) ORDER BY ai.date DESC)
+              FROM activity_instances ai
+              WHERE ai.activity_id = a.id
+              LIMIT 5
+             ) as recent_instances
       FROM activities a
       LEFT JOIN family_members fm ON a.member_id = fm.id
       LEFT JOIN activity_schedule s ON a.id = s.activity_id

@@ -212,6 +212,7 @@ function TripCard({ trip, onEdit, onDelete }) {
 function TripModal({ trip, members, onClose, onSave }) {
   const [formData, setFormData] = useState({
     member_id: trip?.member_id || '',
+    other_traveler_name: trip?.other_traveler_name || '',
     destination: trip?.destination || '',
     departure_date: trip?.departure_date || '',
     departure_time: trip?.departure_time || '',
@@ -229,9 +230,16 @@ function TripModal({ trip, members, onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    await saveTrip(formData)
+    // If "other" was selected, clear member_id and use other_traveler_name
+    const dataToSave = {
+      ...formData,
+      member_id: formData.member_id === 'other' ? null : formData.member_id
+    }
+    await saveTrip(dataToSave)
     onSave()
   }
+
+  const isOtherTraveler = formData.member_id === 'other' || (!formData.member_id && formData.other_traveler_name)
 
   return (
     <Modal title={trip ? 'Edit Trip' : 'Add Trip'} onClose={onClose}>
@@ -240,16 +248,37 @@ function TripModal({ trip, members, onClose, onSave }) {
           <label className="label">Traveler</label>
           <select
             className="input"
-            value={formData.member_id}
-            onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
-            required
+            value={isOtherTraveler ? 'other' : formData.member_id}
+            onChange={(e) => {
+              if (e.target.value === 'other') {
+                setFormData({ ...formData, member_id: 'other', other_traveler_name: '' })
+              } else {
+                setFormData({ ...formData, member_id: e.target.value, other_traveler_name: '' })
+              }
+            }}
+            required={!formData.other_traveler_name}
           >
             <option value="">Select person...</option>
             {members?.map(m => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
+            <option value="other">Other (type name)</option>
           </select>
         </div>
+
+        {isOtherTraveler && (
+          <div>
+            <label className="label">Traveler Name</label>
+            <input
+              type="text"
+              className="input"
+              value={formData.other_traveler_name}
+              onChange={(e) => setFormData({ ...formData, other_traveler_name: e.target.value })}
+              placeholder="e.g., Grandma, Uncle Bob"
+              required
+            />
+          </div>
+        )}
 
         <div>
           <label className="label">Destination</label>
