@@ -33,9 +33,12 @@ router.get('/week', async (req, res, next) => {
 
       // Travel for the week
       db.query(`
-        SELECT t.*, fm.name as member_name, fm.color as member_color, fm.role
+        SELECT t.*,
+               COALESCE(fm.name, t.other_traveler_name) as member_name,
+               COALESCE(fm.color, '#6B7280') as member_color,
+               fm.role
         FROM travel t
-        JOIN family_members fm ON t.member_id = fm.id
+        LEFT JOIN family_members fm ON t.member_id = fm.id
         WHERE (t.departure_date <= $2 AND (t.return_date >= $1 OR t.return_date IS NULL))
            OR (t.departure_date BETWEEN $1 AND $2)
         ORDER BY t.departure_date
@@ -63,7 +66,7 @@ router.get('/week', async (req, res, next) => {
                s.day_of_week, s.start_time, s.end_time,
                s.effective_from, s.effective_until
         FROM activities a
-        JOIN family_members fm ON a.member_id = fm.id
+        LEFT JOIN family_members fm ON a.member_id = fm.id
         JOIN activity_schedule s ON a.id = s.activity_id
         WHERE (s.effective_from IS NULL OR s.effective_from <= $2)
           AND (s.effective_until IS NULL OR s.effective_until >= $1)
@@ -76,7 +79,7 @@ router.get('/week', async (req, res, next) => {
                fm.name as member_name, fm.color as member_color
         FROM activity_instances ai
         JOIN activities a ON ai.activity_id = a.id
-        JOIN family_members fm ON a.member_id = fm.id
+        LEFT JOIN family_members fm ON a.member_id = fm.id
         WHERE ai.date >= $1 AND ai.date <= $2
         ORDER BY ai.date, ai.start_time
       `, [startDate, endDate]),
@@ -344,9 +347,11 @@ router.get('/print', async (req, res, next) => {
     const [members, travel, holidays, schoolDaysOff, activities, childcare] = await Promise.all([
       db.query('SELECT * FROM family_members ORDER BY role, name'),
       db.query(`
-        SELECT t.*, fm.name as member_name, fm.role
+        SELECT t.*,
+               COALESCE(fm.name, t.other_traveler_name) as member_name,
+               fm.role
         FROM travel t
-        JOIN family_members fm ON t.member_id = fm.id
+        LEFT JOIN family_members fm ON t.member_id = fm.id
         WHERE (t.departure_date <= $2 AND (t.return_date >= $1 OR t.return_date IS NULL))
         ORDER BY t.departure_date
       `, [startDate, endDate]),
@@ -366,7 +371,7 @@ router.get('/print', async (req, res, next) => {
         SELECT a.*, fm.name as member_name,
                s.day_of_week, s.start_time, s.end_time
         FROM activities a
-        JOIN family_members fm ON a.member_id = fm.id
+        LEFT JOIN family_members fm ON a.member_id = fm.id
         JOIN activity_schedule s ON a.id = s.activity_id
         WHERE (s.effective_from IS NULL OR s.effective_from <= $2)
           AND (s.effective_until IS NULL OR s.effective_until >= $1)
