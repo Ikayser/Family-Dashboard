@@ -24,7 +24,9 @@ export default function Activities() {
   }
 
   const filteredActivities = selectedMember
-    ? activities?.filter(a => a.member_id.toString() === selectedMember)
+    ? selectedMember === 'family'
+      ? activities?.filter(a => !a.member_id)
+      : activities?.filter(a => a.member_id?.toString() === selectedMember)
     : activities
 
   const children = members?.filter(m => m.role === 'child') || []
@@ -43,13 +45,20 @@ export default function Activities() {
       </div>
 
       {/* Filter by child */}
-      <div className="flex space-x-2">
+      <div className="flex space-x-2 flex-wrap gap-y-2">
         <button
           onClick={() => setSelectedMember('')}
           className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors
             ${!selectedMember ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
         >
           All
+        </button>
+        <button
+          onClick={() => setSelectedMember('family')}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+            ${selectedMember === 'family' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+        >
+          Family
         </button>
         {children.map(child => (
           <button
@@ -124,7 +133,7 @@ function ActivityCard({ activity, onEdit, onDelete }) {
           </div>
           <div>
             <h3 className="font-semibold text-gray-900">{activity.name}</h3>
-            <p className="text-sm text-gray-500">{activity.member_name}</p>
+            <p className="text-sm text-gray-500">{activity.member_name || 'Family'}</p>
           </div>
         </div>
         <div className="flex items-center space-x-1">
@@ -181,10 +190,21 @@ function ActivityModal({ activity, members, onClose, onSave }) {
     color: activity?.color || '#10B981',
   })
 
+  // Determine if this is a recurring or one-time activity based on existing data
+  const hasSchedule = activity?.schedule?.filter(s => s.id).length > 0
+  const [activityMode, setActivityMode] = useState(hasSchedule || !activity ? 'recurring' : 'one-time')
+
   const [schedule, setSchedule] = useState(
     activity?.schedule?.filter(s => s.id) || []
   )
   const [newSlot, setNewSlot] = useState({ day_of_week: '', start_time: '', end_time: '' })
+
+  // One-time activity fields
+  const [oneTimeData, setOneTimeData] = useState({
+    date: '',
+    start_time: '',
+    end_time: ''
+  })
 
   const { mutate: saveActivity, loading: savingActivity } = useMutation(
     activity ? (data) => api.updateActivity(activity.id, data) : api.createActivity
@@ -198,32 +218,45 @@ function ActivityModal({ activity, members, onClose, onSave }) {
     const result = await saveActivity(formData)
     const activityId = activity?.id || result.id
 
-    // Get original schedule IDs for comparison
-    const originalSlotIds = new Set(
-      (activity?.schedule || []).filter(s => s.id).map(s => s.id)
-    )
-    const currentSlotIds = new Set(
-      schedule.filter(s => s.id).map(s => s.id)
-    )
+    if (activityMode === 'recurring') {
+      // Get original schedule IDs for comparison
+      const originalSlotIds = new Set(
+        (activity?.schedule || []).filter(s => s.id).map(s => s.id)
+      )
+      const currentSlotIds = new Set(
+        schedule.filter(s => s.id).map(s => s.id)
+      )
 
-    // Delete removed slots
-    for (const slotId of originalSlotIds) {
-      if (!currentSlotIds.has(slotId)) {
-        await api.deleteActivitySchedule(activityId, slotId)
+      // Delete removed slots
+      for (const slotId of originalSlotIds) {
+        if (!currentSlotIds.has(slotId)) {
+          await api.deleteActivitySchedule(activityId, slotId)
+        }
       }
-    }
 
-    // Add new slots (those without an id)
-    for (const slot of schedule) {
-      if (!slot.id) {
-        await api.addActivitySchedule(activityId, slot)
+      // Add new slots (those without an id)
+      for (const slot of schedule) {
+        if (!slot.id) {
+          await api.addActivitySchedule(activityId, slot)
+        }
       }
-    }
 
-    // Update existing slots that might have changed
-    for (const slot of schedule) {
-      if (slot.id && slot._modified) {
-        await api.updateActivitySchedule(activityId, slot.id, slot)
+      // Update existing slots that might have changed
+      for (const slot of schedule) {
+        if (slot.id && slot._modified) {
+          await api.updateActivitySchedule(activityId, slot.id, slot)
+        }
+      }
+    } else {
+      // One-time activity - create an activity instance
+      if (oneTimeData.date) {
+        await api.addActivityInstance(activityId, {
+          date: oneTimeData.date,
+          start_time: oneTimeData.start_time || null,
+          end_time: oneTimeData.end_time || null,
+          status: 'scheduled',
+          source: 'manual'
+        })
       }
     }
 
@@ -248,14 +281,13 @@ function ActivityModal({ activity, members, onClose, onSave }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="label">Child</label>
+            <label className="label">For (optional)</label>
             <select
               className="input"
               value={formData.member_id}
               onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
-              required
             >
-              <option value="">Select...</option>
+              <option value="">None / Family</option>
               {children.map(m => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
@@ -312,7 +344,37 @@ function ActivityModal({ activity, members, onClose, onSave }) {
           />
         </div>
 
-        {/* Schedule */}
+        {/* Activity Type Toggle */}
+        <div className="border-t border-gray-200 pt-4">
+          <label className="label">Frequency</label>
+          <div className="flex space-x-2">
+            <button
+              type="button"
+              onClick={() => setActivityMode('recurring')}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors border-2 ${
+                activityMode === 'recurring'
+                  ? 'bg-primary-100 border-primary-500 text-primary-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              📅 Weekly (recurring)
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivityMode('one-time')}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors border-2 ${
+                activityMode === 'one-time'
+                  ? 'bg-primary-100 border-primary-500 text-primary-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              📌 One-time event
+            </button>
+          </div>
+        </div>
+
+        {/* Weekly Schedule - only show for recurring */}
+        {activityMode === 'recurring' && (
         <div className="border-t border-gray-200 pt-4">
           <label className="label">Weekly Schedule</label>
 
@@ -400,6 +462,44 @@ function ActivityModal({ activity, members, onClose, onSave }) {
             </button>
           </div>
         </div>
+        )}
+
+        {/* One-time activity date picker */}
+        {activityMode === 'one-time' && (
+        <div className="border-t border-gray-200 pt-4">
+          <label className="label">Event Date & Time</label>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-gray-500">Date</label>
+              <input
+                type="date"
+                className="input"
+                value={oneTimeData.date}
+                onChange={(e) => setOneTimeData({ ...oneTimeData, date: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Start Time</label>
+              <input
+                type="time"
+                className="input"
+                value={oneTimeData.start_time}
+                onChange={(e) => setOneTimeData({ ...oneTimeData, start_time: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">End Time</label>
+              <input
+                type="time"
+                className="input"
+                value={oneTimeData.end_time}
+                onChange={(e) => setOneTimeData({ ...oneTimeData, end_time: e.target.value })}
+              />
+            </div>
+          </div>
+        </div>
+        )}
 
         <div className="flex justify-end space-x-2 pt-4">
           <button type="button" onClick={onClose} className="btn btn-secondary">

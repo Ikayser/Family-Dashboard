@@ -19,7 +19,7 @@ router.get('/', async (req, res, next) => {
                'effective_until', s.effective_until
              )) FILTER (WHERE s.id IS NOT NULL) as schedule
       FROM activities a
-      JOIN family_members fm ON a.member_id = fm.id
+      LEFT JOIN family_members fm ON a.member_id = fm.id
       LEFT JOIN activity_schedule s ON a.id = s.activity_id
     `;
     const params = [];
@@ -44,7 +44,7 @@ router.get('/:id', async (req, res, next) => {
     const activityResult = await db.query(`
       SELECT a.*, fm.name as member_name
       FROM activities a
-      JOIN family_members fm ON a.member_id = fm.id
+      LEFT JOIN family_members fm ON a.member_id = fm.id
       WHERE a.id = $1
     `, [req.params.id]);
 
@@ -95,9 +95,10 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { member_id, name, type, location, instructor, notes, color } = req.body;
+    // member_id can be null (family activity), so don't use COALESCE for it
     const result = await db.query(
       `UPDATE activities SET
-        member_id = COALESCE($1, member_id),
+        member_id = $1,
         name = COALESCE($2, name),
         type = COALESCE($3, type),
         location = COALESCE($4, location),
@@ -106,7 +107,7 @@ router.put('/:id', async (req, res, next) => {
         color = COALESCE($7, color)
       WHERE id = $8
       RETURNING *`,
-      [member_id, name, type, location, instructor, notes, color, req.params.id]
+      [member_id || null, name, type, location, instructor, notes, color, req.params.id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Activity not found' });
@@ -246,7 +247,7 @@ router.get('/calendar/range', async (req, res, next) => {
       SELECT a.*, fm.name as member_name, fm.color as member_color,
              s.day_of_week, s.start_time, s.end_time, s.effective_from, s.effective_until
       FROM activities a
-      JOIN family_members fm ON a.member_id = fm.id
+      LEFT JOIN family_members fm ON a.member_id = fm.id
       JOIN activity_schedule s ON a.id = s.activity_id
       WHERE (s.effective_from IS NULL OR s.effective_from <= $2)
         AND (s.effective_until IS NULL OR s.effective_until >= $1)
@@ -258,7 +259,7 @@ router.get('/calendar/range', async (req, res, next) => {
              fm.name as member_name, fm.color as member_color
       FROM activity_instances ai
       JOIN activities a ON ai.activity_id = a.id
-      JOIN family_members fm ON a.member_id = fm.id
+      LEFT JOIN family_members fm ON a.member_id = fm.id
       WHERE ai.date >= $1 AND ai.date <= $2
     `, [startDate, endDate]);
 
