@@ -53,6 +53,23 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Migration endpoint - run pending database migrations
+app.post('/api/migrate', async (req, res) => {
+  const db = require('./db');
+  const migrations = [];
+
+  try {
+    // Add other_traveler_name column to travel table
+    await db.query(`ALTER TABLE travel ADD COLUMN IF NOT EXISTS other_traveler_name VARCHAR(255)`);
+    migrations.push('Added other_traveler_name to travel table');
+
+    res.json({ success: true, migrations });
+  } catch (err) {
+    console.error('Migration error:', err);
+    res.status(500).json({ error: err.message, migrations });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
