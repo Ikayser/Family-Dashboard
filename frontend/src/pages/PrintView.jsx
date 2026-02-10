@@ -8,7 +8,7 @@ import api from '../utils/api'
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function PrintView() {
-  const [weeks, setWeeks] = useState(2)
+  const [weeks, setWeeks] = useState(1)
   const { data, loading } = useApi(() => api.getPrintData(weeks), [weeks], true)
 
   const handlePrint = () => {
@@ -27,7 +27,7 @@ export default function PrintView() {
 
   // Build day-by-day data
   const startDate = start_date ? parseISO(start_date) : new Date()
-  const endDate = end_date ? parseISO(end_date) : addDays(new Date(), 13)
+  const endDate = end_date ? parseISO(end_date) : addDays(new Date(), 6)
 
   const days = eachDayOfInterval({ start: startDate, end: endDate }).map(date => {
     const dateStr = format(date, 'yyyy-MM-dd')
@@ -37,13 +37,15 @@ export default function PrintView() {
       date: dateStr,
       dateObj: date,
       dayOfWeek,
-      travel: travel?.filter(t =>
-        dateStr >= t.departure_date && dateStr <= (t.return_date || t.departure_date)
-      ) || [],
-      holiday: holidays?.find(h => h.date === dateStr),
-      schoolDaysOff: school_days_off?.filter(s => s.date === dateStr) || [],
+      travel: travel?.filter(t => {
+        const depDate = t.departure_date?.split('T')[0] || t.departure_date
+        const retDate = t.return_date?.split('T')[0] || t.return_date || depDate
+        return dateStr >= depDate && dateStr <= retDate
+      }) || [],
+      holiday: holidays?.find(h => (h.date?.split('T')[0] || h.date) === dateStr),
+      schoolDaysOff: school_days_off?.filter(s => (s.date?.split('T')[0] || s.date) === dateStr) || [],
       activities: activities?.filter(a => a.day_of_week === dayOfWeek) || [],
-      childcare: childcare?.find(c => c.date === dateStr),
+      childcare: childcare?.find(c => (c.date?.split('T')[0] || c.date) === dateStr),
     }
   })
 
@@ -55,6 +57,78 @@ export default function PrintView() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Print-specific styles */}
+      <style>{`
+        @media print {
+          @page {
+            size: letter portrait;
+            margin: 0.4in;
+          }
+          body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .print-container {
+            width: 100% !important;
+            max-width: none !important;
+            padding: 0 !important;
+          }
+          .print-title {
+            font-size: 16px !important;
+            margin-bottom: 4px !important;
+          }
+          .print-subtitle {
+            font-size: 11px !important;
+            margin-bottom: 8px !important;
+          }
+          .print-legend {
+            padding: 4px 8px !important;
+            margin-bottom: 8px !important;
+            font-size: 9px !important;
+          }
+          .print-week-title {
+            font-size: 11px !important;
+            margin-bottom: 4px !important;
+          }
+          .print-day-header {
+            padding: 2px !important;
+          }
+          .print-day-header .day-name {
+            font-size: 8px !important;
+          }
+          .print-day-header .day-num {
+            font-size: 12px !important;
+          }
+          .print-day-cell {
+            min-height: 70px !important;
+            height: auto !important;
+            padding: 2px !important;
+            font-size: 8px !important;
+          }
+          .print-day-cell > div {
+            margin-bottom: 1px !important;
+            padding: 1px 2px !important;
+          }
+          .print-summary {
+            margin-top: 8px !important;
+          }
+          .print-summary h3 {
+            font-size: 10px !important;
+            margin-bottom: 4px !important;
+          }
+          .print-summary table {
+            font-size: 8px !important;
+          }
+          .print-summary th, .print-summary td {
+            padding: 2px 4px !important;
+          }
+          .print-footer {
+            margin-top: 8px !important;
+            font-size: 8px !important;
+          }
+        }
+      `}</style>
+
       {/* Header - hidden when printing */}
       <div className="no-print bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900">
@@ -70,7 +144,6 @@ export default function PrintView() {
           >
             <option value={1}>1 Week</option>
             <option value={2}>2 Weeks</option>
-            <option value={4}>4 Weeks</option>
           </select>
 
           <button onClick={handlePrint} className="btn btn-primary flex items-center">
@@ -81,22 +154,22 @@ export default function PrintView() {
       </div>
 
       {/* Printable Content */}
-      <div className="p-4 md:p-8 max-w-5xl mx-auto">
+      <div className="print-container p-4 md:p-6 max-w-4xl mx-auto">
         {/* Title */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Family Schedule</h1>
-          <p className="text-gray-500">
+        <div className="text-center mb-4">
+          <h1 className="print-title text-xl font-bold text-gray-900">Family Schedule</h1>
+          <p className="print-subtitle text-gray-500 text-sm">
             {format(startDate, 'MMMM d')} - {format(endDate, 'MMMM d, yyyy')}
           </p>
         </div>
 
         {/* Legend */}
-        <div className="mb-6 p-3 bg-gray-50 rounded-lg print:bg-white print:border print:border-gray-200">
-          <div className="flex flex-wrap gap-4 justify-center text-sm">
+        <div className="print-legend mb-4 p-2 bg-gray-50 rounded-lg print:bg-white print:border print:border-gray-200">
+          <div className="flex flex-wrap gap-3 justify-center text-xs">
             {members?.map(member => (
               <div key={member.id} className="flex items-center">
                 <div
-                  className="w-3 h-3 rounded-full mr-1.5"
+                  className="w-2.5 h-2.5 rounded-full mr-1"
                   style={{ backgroundColor: member.color }}
                 />
                 <span>{member.name}</span>
@@ -107,8 +180,8 @@ export default function PrintView() {
 
         {/* Weekly Calendars */}
         {weekGroups.map((week, weekIdx) => (
-          <div key={weekIdx} className="mb-8 page-break">
-            <h2 className="text-lg font-semibold text-gray-800 mb-3">
+          <div key={weekIdx} className="mb-4">
+            <h2 className="print-week-title text-sm font-semibold text-gray-800 mb-2">
               Week of {format(week[0].dateObj, 'MMMM d, yyyy')}
             </h2>
 
@@ -118,11 +191,11 @@ export default function PrintView() {
                 {week.map((day, idx) => (
                   <div
                     key={idx}
-                    className={`p-2 text-center border-r border-gray-300 last:border-r-0
+                    className={`print-day-header p-1.5 text-center border-r border-gray-300 last:border-r-0
                       ${day.dayOfWeek === 0 || day.dayOfWeek === 6 ? 'bg-gray-200' : ''}`}
                   >
-                    <div className="text-xs text-gray-500 uppercase">{DAYS[day.dayOfWeek]}</div>
-                    <div className="text-lg font-semibold">{format(day.dateObj, 'd')}</div>
+                    <div className="day-name text-[10px] text-gray-500 uppercase">{DAYS[day.dayOfWeek]}</div>
+                    <div className="day-num text-base font-semibold">{format(day.dateObj, 'd')}</div>
                   </div>
                 ))}
               </div>
@@ -137,34 +210,32 @@ export default function PrintView() {
           </div>
         ))}
 
-        {/* Summary Tables */}
-        <div className="grid md:grid-cols-2 gap-6 mt-8">
-          {/* Upcoming Travel */}
+        {/* Compact Summary - side by side */}
+        <div className="print-summary grid grid-cols-2 gap-4 mt-4">
+          {/* Travel */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Travel Summary</h3>
-            <table className="w-full text-sm border border-gray-300">
+            <h3 className="text-xs font-semibold text-gray-800 mb-1">Travel</h3>
+            <table className="w-full text-[10px] border border-gray-300">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="px-3 py-2 text-left border-b">Who</th>
-                  <th className="px-3 py-2 text-left border-b">Dates</th>
-                  <th className="px-3 py-2 text-left border-b">Destination</th>
+                  <th className="px-2 py-1 text-left border-b">Who</th>
+                  <th className="px-2 py-1 text-left border-b">When</th>
+                  <th className="px-2 py-1 text-left border-b">Where</th>
                 </tr>
               </thead>
               <tbody>
-                {travel?.map((trip, idx) => (
+                {travel?.slice(0, 4).map((trip, idx) => (
                   <tr key={idx} className="border-b border-gray-200 last:border-b-0">
-                    <td className="px-3 py-2">{trip.member_name}</td>
-                    <td className="px-3 py-2">
-                      {format(parseISO(trip.departure_date), 'MMM d')}
-                      {trip.return_date && ` - ${format(parseISO(trip.return_date), 'MMM d')}`}
+                    <td className="px-2 py-1">{trip.member_name}</td>
+                    <td className="px-2 py-1">
+                      {format(parseISO(trip.departure_date), 'M/d')}
+                      {trip.return_date && `-${format(parseISO(trip.return_date), 'M/d')}`}
                     </td>
-                    <td className="px-3 py-2">{trip.destination || '-'}</td>
+                    <td className="px-2 py-1 truncate max-w-[80px]">{trip.destination || '-'}</td>
                   </tr>
                 ))}
                 {(!travel || travel.length === 0) && (
-                  <tr>
-                    <td colSpan={3} className="px-3 py-2 text-gray-500 text-center">No travel scheduled</td>
-                  </tr>
+                  <tr><td colSpan={3} className="px-2 py-1 text-gray-400 text-center">None</td></tr>
                 )}
               </tbody>
             </table>
@@ -172,35 +243,23 @@ export default function PrintView() {
 
           {/* Childcare */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Childcare Coverage</h3>
-            <table className="w-full text-sm border border-gray-300">
+            <h3 className="text-xs font-semibold text-gray-800 mb-1">Childcare</h3>
+            <table className="w-full text-[10px] border border-gray-300">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="px-3 py-2 text-left border-b">Date</th>
-                  <th className="px-3 py-2 text-left border-b">Caregiver</th>
-                  <th className="px-3 py-2 text-left border-b">Status</th>
+                  <th className="px-2 py-1 text-left border-b">Date</th>
+                  <th className="px-2 py-1 text-left border-b">Caregiver</th>
                 </tr>
               </thead>
               <tbody>
-                {childcare?.map((cc, idx) => (
+                {childcare?.slice(0, 4).map((cc, idx) => (
                   <tr key={idx} className="border-b border-gray-200 last:border-b-0">
-                    <td className="px-3 py-2">{format(parseISO(cc.date), 'EEE, MMM d')}</td>
-                    <td className="px-3 py-2">{cc.caregiver_member_name || cc.caregiver_name || '-'}</td>
-                    <td className="px-3 py-2">
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        cc.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                        cc.status === 'tentative' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {cc.status}
-                      </span>
-                    </td>
+                    <td className="px-2 py-1">{format(parseISO(cc.date), 'EEE M/d')}</td>
+                    <td className="px-2 py-1">{cc.caregiver_member_name || cc.caregiver_name || '-'}</td>
                   </tr>
                 ))}
                 {(!childcare || childcare.length === 0) && (
-                  <tr>
-                    <td colSpan={3} className="px-3 py-2 text-gray-500 text-center">No childcare scheduled</td>
-                  </tr>
+                  <tr><td colSpan={2} className="px-2 py-1 text-gray-400 text-center">None</td></tr>
                 )}
               </tbody>
             </table>
@@ -208,8 +267,8 @@ export default function PrintView() {
         </div>
 
         {/* Footer */}
-        <div className="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
-          Printed on {format(new Date(), 'MMMM d, yyyy \'at\' h:mm a')}
+        <div className="print-footer mt-4 pt-2 border-t border-gray-200 text-center text-[10px] text-gray-400">
+          Printed {format(new Date(), 'M/d/yyyy h:mm a')}
         </div>
       </div>
     </div>
@@ -221,20 +280,20 @@ function DayCell({ day }) {
 
   return (
     <div className={`
-      min-h-[100px] p-1.5 border-r border-gray-300 last:border-r-0 text-xs
+      print-day-cell min-h-[80px] p-1 border-r border-gray-300 last:border-r-0 text-[10px]
       ${isWeekend ? 'bg-gray-50' : ''}
       ${day.holiday ? 'bg-yellow-50' : ''}
     `}>
       {/* Holiday */}
       {day.holiday && (
-        <div className="bg-yellow-200 text-yellow-900 px-1 py-0.5 rounded mb-1 truncate">
+        <div className="bg-yellow-200 text-yellow-900 px-1 py-0.5 rounded mb-0.5 truncate text-[9px]">
           {day.holiday.name}
         </div>
       )}
 
       {/* School days off */}
       {day.schoolDaysOff.map((sdo, idx) => (
-        <div key={idx} className="bg-orange-100 text-orange-800 px-1 py-0.5 rounded mb-1 truncate">
+        <div key={idx} className="bg-orange-100 text-orange-800 px-1 py-0.5 rounded mb-0.5 truncate text-[9px]">
           {sdo.school_name}: Off
         </div>
       ))}
@@ -243,30 +302,30 @@ function DayCell({ day }) {
       {day.travel.map((trip, idx) => (
         <div
           key={idx}
-          className="px-1 py-0.5 rounded mb-1 truncate"
-          style={{ backgroundColor: `${trip.member_color}30`, color: trip.member_color }}
+          className="px-1 py-0.5 rounded mb-0.5 truncate text-[9px]"
+          style={{ backgroundColor: `${trip.member_color || '#6B7280'}30`, color: trip.member_color || '#6B7280' }}
         >
-          ✈️ {trip.member_name}
+          ✈ {trip.member_name}
         </div>
       ))}
 
       {/* Activities */}
-      {day.activities.slice(0, 3).map((activity, idx) => (
+      {day.activities.slice(0, 2).map((activity, idx) => (
         <div
           key={idx}
-          className="px-1 py-0.5 rounded mb-1 truncate bg-gray-100"
+          className="px-1 py-0.5 rounded mb-0.5 truncate bg-gray-100 text-[9px]"
         >
-          {activity.member_name}: {activity.name}
+          {activity.name}
         </div>
       ))}
 
-      {day.activities.length > 3 && (
-        <div className="text-gray-400">+{day.activities.length - 3}</div>
+      {day.activities.length > 2 && (
+        <div className="text-gray-400 text-[8px]">+{day.activities.length - 2}</div>
       )}
 
       {/* Childcare */}
       {day.childcare && (
-        <div className="bg-green-100 text-green-800 px-1 py-0.5 rounded mt-auto truncate">
+        <div className="bg-green-100 text-green-800 px-1 py-0.5 rounded truncate text-[9px]">
           👶 {day.childcare.caregiver_member_name || day.childcare.caregiver_name}
         </div>
       )}
